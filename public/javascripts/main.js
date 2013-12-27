@@ -1,13 +1,13 @@
 $(function(){
 
 
-        var ws = $.gracefulWebSocket("ws://localhost:9000/chat");
+        var ws = $.gracefulWebSocket("ws:///chat");
 
 
         $("#connect").click(function(){
            var chat = $("#chatselect").val();
            ws.close();
-           ws = $.gracefulWebSocket("ws://localhost:9000/"+chat);
+           ws = $.gracefulWebSocket("ws:///"+chat);
            
            
            ws.onmessage = function (event) {
