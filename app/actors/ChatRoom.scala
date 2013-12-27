@@ -17,6 +17,8 @@ case class JoinToRoom[T](p: Promise[T],roomName:String)
 case class BindRoom[T](p: Promise[T])
 case class NewChatter[T,B](p:Promise[T],out:Enumerator[B])
 case class Msg[T](msg:T)
+case class Start(room:ActorRef)
+case class KeepAlive()
 
 object ChatRoom {
   val chatRooms = Akka.system.actorOf(Props[ChatRooms[String]])
@@ -28,14 +30,28 @@ object ChatRoom {
 }
 
 
-class ChatRobot(chatRoom:ActorRef) {
-     import play.api.libs.concurrent.Execution.Implicits._
-     Akka.system.scheduler.schedule(
-      30 seconds,
-      30 seconds,
-      chatRoom,
-      Msg("Robot")
-    )
+class ChatRobot extends Actor {
+     var chatRoom:ActorRef = null
+     var counter:Int = 0
+     def receive={
+       case Start(room) => {
+          chatRoom = room
+          import play.api.libs.concurrent.Execution.Implicits._
+		  Akka.system.scheduler.schedule(
+		      30 seconds,
+		      30 seconds,
+		      self,
+		      KeepAlive
+		    )
+       
+       } 
+       case KeepAlive =>{
+         chatRoom ! Msg("["+counter+"] Robot vagyok!")
+         counter+=1
+       } 
+     }
+     
+    
      
 }
 
@@ -45,8 +61,9 @@ class ChatRooms[T] extends Actor{
       case JoinToRoom(promise,roomName)=>
         val room = rooms.getOrElse(roomName, {
             val actor =  Akka.system.actorOf(Props[ChatRoom[String]]) 
+            val chatRobot = Akka.system.actorOf(Props[ChatRobot]) 
+            chatRobot ! Start(actor)
             rooms+= (roomName->actor)
-            new ChatRobot(actor)
             actor
            }); 
         room ! BindRoom(promise)
