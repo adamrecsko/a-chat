@@ -12,7 +12,7 @@ import play.api.libs.iteratee.Iteratee
 import akka.actor.ActorRef
 import play.api.libs.iteratee.Enumerator
 import scala.concurrent.duration._
-
+import java.util.Calendar
 case class JoinToRoom[T](p: Promise[T],roomName:String)
 case class BindRoom[T](p: Promise[T])
 case class NewChatter[T,B](p:Promise[T],out:Enumerator[B])
@@ -61,7 +61,10 @@ class ChatRoom[T] extends Actor {
 	     val chatter =  Akka.system.actorOf(Props[Chatter[String]]) 
 	     chatter ! NewChatter(promise,out)
 	   }
-	   case Msg(msg:String) => chatChannel.push(msg)
+	   case Msg(msg:String) =>{
+	     val pushMsg = Calendar.getInstance().getTime().toString()  + " : " +msg
+	     chatChannel.push(pushMsg)
+	   } 
 	 }
 	 
 }
