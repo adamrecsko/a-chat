@@ -1,13 +1,13 @@
 $(function(){
 
 
-        var ws = $.gracefulWebSocket("ws:///chat");
+        var ws = $.gracefulWebSocket("ws://rocky-thicket-8654.herokuapp.com/chat");
 
 
         $("#connect").click(function(){
            var chat = $("#chatselect").val();
            ws.close();
-           ws = $.gracefulWebSocket("ws:///"+chat);
+           ws = $.gracefulWebSocket("ws://rocky-thicket-8654.herokuapp.com/"+chat);
            
            
            ws.onmessage = function (event) {
