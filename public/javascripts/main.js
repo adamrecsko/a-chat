@@ -165,21 +165,25 @@ function  ComService (options)  {
          return websocket;
      }
 
+     this.reconnect = function(){
+         this.connect(this.defaults.url);
+     }
+
      this.connect = function(url){
          if (this.ws) this.ws.close();
          this.onConnect(new Event());
          this.ws = new WebSocket(url);
          return this.bindEvents(this.ws);
      }  
-     this.connect(this.defaults.url);
-     
-     
-     
+
+     this.reconnect()
 }
 
 var service = new ComService({
     url: "ws://"+window.location.host+"/chat",
-    
+    onClose: function(){
+        setTimeout(function(){service.reconnect()},2000);
+    }
  });
 
 
