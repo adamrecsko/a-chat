@@ -70,7 +70,7 @@ class ChatRobot extends Actor {
        
        } 
        case KeepAlive =>{
-         chatRoom ! Msg("Robot","Robot vagyok")
+        // chatRoom ! Msg("Robot","Robot vagyok")
          counter+=1
        } 
      }
