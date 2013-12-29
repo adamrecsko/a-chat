@@ -1,6 +1,7 @@
 $(function(){
         var ws;
         function connect(url){
+            console.log("connect");
            if (ws)  ws.close();
            ws =new WebSocket(url);
            ws.onmessage = function (event) {
@@ -23,7 +24,10 @@ $(function(){
 			   console.log(messageFromServer);
 		   }; 
 		   ws.onclose = function(){
+		       console.log("WS closed, try, to reconnect");
+		       
                setTimeout(function(){
+              
                
                connect(url)
                
