@@ -214,7 +214,10 @@ function send(){
           msg.from="Én";
           $msg = appendMsg(msg,'info');
           service.sure("message",msg,5000)
-           .onFailed(function(err){  alert("Nem sikerült elküldeni az üzenetet.") })
+           .onFailed(function(err){ 
+              $($msg).removeClass('panel-info').addClass('panel-danger');
+
+            })
            .onSuccess(function(data){
                 $($msg).removeClass('panel-info').addClass('panel-success');
            });
