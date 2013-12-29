@@ -23,7 +23,11 @@ $(function(){
 			   console.log(messageFromServer);
 		   }; 
 		   ws.onclose = function(){
-               setTimeout(function(){start(url)}, 5000);
+               setTimeout(function(){
+               
+               connect(url)
+               
+               }, 3000);
            };
         }
         var chatUrl = "ws://"+window.location.host;
