@@ -19,7 +19,7 @@ $(function(){
 			//   $(".income").append("<li>"+msg.from +"("+(new Date(msg.time))+"):<h3>"+msg.msg+"</h3></li>"); 
 			
 			   $(".income").append(fmsg);
-			   $("#chatbox").scrollTop( $("#chatbox").scrollTop()+100);
+			   $("#chatbox").scrollTop( $("#chatbox").scrollTop()+200);
 			   console.log(messageFromServer);
 		   }; 
 		   ws.onclose = function(){
