@@ -20,13 +20,19 @@ import play.api.libs.json.Json
 import play.api.libs.json.JsObject
 case class JoinToRoom[T](p: Promise[T],roomName:String)
 case class BindRoom[T](p: Promise[T])
-case class NewChatter[T,B](p:Promise[T],out:Enumerator[B])
+case class NewChatter[T,B](p:Promise[T])
 
 case class Start(room:ActorRef)
 case class KeepAlive()
 case class Disconnect()
 
-case class Msg(from:String, content:String){
+case class Msg(
+    from:Option[String]= None,
+    content:Option[String] = None,
+    _type:Option[String]=Some("message"),
+    _channel:Option[String] = Some("message"),
+    _transferid : Option[String] = None 
+   ){
     val localTimestamp = new java.sql.Timestamp(Calendar.getInstance().getTime().getTime())
 }
 
@@ -35,10 +41,23 @@ case class Msg(from:String, content:String){
 
 object MessageImplicits{
   implicit def JsObject2Msg(value:JsObject):Msg={
-      return Msg(from=(value\"from").toString(),content=(value\"msg").as[String])
+      return Msg(
+          from=(value\"from").asOpt[String],
+          content=(value\"msg").asOpt[String],
+          _transferid=(value\"_transferid").asOpt[String],
+          _channel=(value\"_channel").asOpt[String],
+          _type=(value\"_type").asOpt[String]
+      )
    }
   implicit def Msg2JsObject(value:Msg):JsObject={
-      return Json.obj("from"->value.from,"msg"->value.content,"time"->value.localTimestamp)
+      return Json.obj(
+          "from"->value.from,
+          "msg"->value.content,
+          "time"->value.localTimestamp,
+          "_type"->value._type,
+          "_channel"->value._channel,
+          "_transferid"->value._transferid
+     )
    }
 }
 
@@ -70,7 +89,7 @@ class ChatRobot extends Actor {
        
        } 
        case KeepAlive =>{
-        // chatRoom ! Msg("Robot","Robot vagyok")
+       //  chatRoom ! Msg(Some("Robot"),Some("Robot vagyok"))
          counter+=1
        } 
      }
@@ -96,14 +115,18 @@ class ChatRooms[T] extends Actor{
 }
 
 class ChatRoom[T] extends Actor {
-     val (out, chatChannel) = Concurrent.broadcast[JsObject]	
+     var chatters = List[ActorRef]()
 	 def receive = {
 	   case BindRoom(promise) => {
-	     val chatter =  Akka.system.actorOf(Props[Chatter]) 
-	     chatter ! NewChatter(promise,out)
+	     val chatter =  Akka.system.actorOf(Props[Chatter])
+	     chatters=chatter::chatters
+	     chatter ! NewChatter(promise)
 	   }
 	   case msg:Msg =>{	     
-	     chatChannel.push(msg)
+	        for (
+	           chatter <- chatters
+	           if chatter!=context.sender	           
+	        ) {chatter ! msg}
 	   } 
 	   
 	   case Disconnect =>
@@ -115,25 +138,30 @@ class ChatRoom[T] extends Actor {
 
 class Chatter extends Actor{
      val uuid:String = java.util.UUID.randomUUID.toString
+     val (out, chatChannel) = Concurrent.broadcast[JsObject]	
      def procede(msg:Msg)(chatroom: ActorRef) = {
-       chatroom ! Msg(from=uuid, content=msg.content)
+       chatroom ! Msg(from=Some(uuid),
+           content=msg.content,
+           _channel=msg._channel,
+           _transferid=msg._transferid)
        println(msg)
      }
      def disconnect(chatroom:ActorRef) ={
-        chatroom ! Msg(from=uuid,content="User disconnected")
+        chatroom ! Msg(from=Some(uuid),content=Some("User disconnected"),_channel=Some("users"))
         chatroom ! Disconnect
 	    context.stop(self)
      }
      def receive = {
-       case NewChatter(promise,out)=>{
+       case NewChatter(promise)=>{
              val chatroom = context.sender
-             chatroom ! Msg(uuid,"Connected")
-	          val in = Iteratee.foreach((msg:JsObject)=>{ procede(msg)(chatroom)}  ).mapDone(_=>{
+             chatroom ! Msg(from=Some(uuid),content=Some("Connected"),_channel=Some("users"))
+	          val in = Iteratee.foreach((msg:JsObject)=>{procede(msg)(chatroom)}  ).mapDone(_=>{
 		        disconnect(chatroom)
 		    })
 		    val res = (in,out)
 	        promise.success(res)
        }
+       case msg:Msg=> chatChannel.push(msg)
    }
 }
 
