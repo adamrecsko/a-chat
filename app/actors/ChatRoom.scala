@@ -127,6 +127,7 @@ class Chatter extends Actor{
      def receive = {
        case NewChatter(promise,out)=>{
              val chatroom = context.sender
+             chatroom ! Msg(uuid,"Connected")
 	          val in = Iteratee.foreach((msg:JsObject)=>{ procede(msg)(chatroom)}  ).mapDone(_=>{
 		        disconnect(chatroom)
 		    })
