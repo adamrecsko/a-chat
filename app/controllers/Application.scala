@@ -10,6 +10,10 @@ import scala.concurrent.Future
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.iteratee.Concurrent
 import actors.ChatRoom
+import play.api.libs.json.JsObject
+import play.api.libs.json.DefaultFormat
+import play.api.libs.json.JsValue
+
 object Application extends Controller {
   
   val (out, chatChannel) = Concurrent.broadcast[String]
@@ -19,13 +23,14 @@ object Application extends Controller {
       Ok(views.html.index()  )
   }
 
-  def chat = WebSocket.async[String] {
+  def chat = WebSocket.async[JsValue] {
       request => {   
+    
          ChatRoom.join("chat1")
       }
   }
   
-    def chat2 = WebSocket.async[String] {
+    def chat2 = WebSocket.async[JsValue] {
       request => {   
          ChatRoom.join("chat2")
       }

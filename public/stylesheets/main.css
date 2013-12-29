@@ -1,5 +1,5 @@
 #chatbox{
     height:300px;
-    overflow-y: scroll;
-    width:500px;
+    overflow-y: auto;
+  
 }

@@ -13,15 +13,39 @@ import akka.actor.ActorRef
 import play.api.libs.iteratee.Enumerator
 import scala.concurrent.duration._
 import java.util.Calendar
+import play.api.libs.json.JsObject
+import play.api.libs.json.JsString
+import play.api.libs.json.JsValue
+import play.api.libs.json.Json
+import play.api.libs.json.JsObject
 case class JoinToRoom[T](p: Promise[T],roomName:String)
 case class BindRoom[T](p: Promise[T])
 case class NewChatter[T,B](p:Promise[T],out:Enumerator[B])
-case class Msg[T](msg:T)
+
 case class Start(room:ActorRef)
 case class KeepAlive()
+case class Disconnect()
+
+case class Msg(from:String, content:String){
+    val localTimestamp = new java.sql.Timestamp(Calendar.getInstance().getTime().getTime())
+}
+
+
+
+
+object MessageImplicits{
+  implicit def JsObject2Msg(value:JsObject):Msg={
+      return Msg(from=(value\"from").toString(),content=(value\"msg").as[String])
+   }
+  implicit def Msg2JsObject(value:Msg):JsObject={
+      return Json.obj("from"->value.from,"msg"->value.content,"time"->value.localTimestamp)
+   }
+}
+
+import MessageImplicits._
 
 object ChatRoom {
-  val chatRooms = Akka.system.actorOf(Props[ChatRooms[String]])
+  val chatRooms = Akka.system.actorOf(Props[ChatRooms[JsValue]])
   def join[T](room:String): Future[T] = {
      val prom = Promise[T]
      chatRooms ! JoinToRoom(prom,room)     
@@ -38,15 +62,15 @@ class ChatRobot extends Actor {
           chatRoom = room
           import play.api.libs.concurrent.Execution.Implicits._
 		  Akka.system.scheduler.schedule(
-		      30 seconds,
-		      30 seconds,
+		      1 minutes,
+		      1 minutes,
 		      self,
 		      KeepAlive
 		    )
        
        } 
        case KeepAlive =>{
-         chatRoom ! Msg("["+counter+"] Robot vagyok!")
+         chatRoom ! Msg("Robot","Robot vagyok")
          counter+=1
        } 
      }
@@ -60,7 +84,7 @@ class ChatRooms[T] extends Actor{
     def receive = {
       case JoinToRoom(promise,roomName)=>
         val room = rooms.getOrElse(roomName, {
-            val actor =  Akka.system.actorOf(Props[ChatRoom[String]]) 
+            val actor =  Akka.system.actorOf(Props[ChatRoom[T]]) 
             val chatRobot = Akka.system.actorOf(Props[ChatRobot]) 
             chatRobot ! Start(actor)
             rooms+= (roomName->actor)
@@ -72,34 +96,38 @@ class ChatRooms[T] extends Actor{
 }
 
 class ChatRoom[T] extends Actor {
-     val (out, chatChannel) = Concurrent.broadcast[String]	
+     val (out, chatChannel) = Concurrent.broadcast[JsObject]	
 	 def receive = {
 	   case BindRoom(promise) => {
-	     val chatter =  Akka.system.actorOf(Props[Chatter[String]]) 
+	     val chatter =  Akka.system.actorOf(Props[Chatter]) 
 	     chatter ! NewChatter(promise,out)
 	   }
-	   case Msg(msg:String) =>{
-	     val pushMsg = Calendar.getInstance().getTime().toString()  + " : " +msg
-	     chatChannel.push(pushMsg)
+	   case msg:Msg =>{	     
+	     chatChannel.push(msg)
 	   } 
+	   
+	   case Disconnect =>
+	      
 	 }
 	 
 }
 
 
-class Chatter[T] extends Actor{
-     def procede(msg:String)(chatroom: ActorRef) = {
-       chatroom ! Msg(msg)
+class Chatter extends Actor{
+     val uuid:String = java.util.UUID.randomUUID.toString
+     def procede(msg:Msg)(chatroom: ActorRef) = {
+       chatroom ! Msg(from=uuid, content=msg.content)
        println(msg)
      }
      def disconnect(chatroom:ActorRef) ={
-        procede("By")(chatroom)
+        chatroom ! Msg(from=uuid,content="User disconnected")
+        chatroom ! Disconnect
 	    context.stop(self)
      }
      def receive = {
        case NewChatter(promise,out)=>{
              val chatroom = context.sender
-	          val in = Iteratee.foreach((msg:String)=>{ procede(msg)(chatroom)}  ).mapDone(_=>{
+	          val in = Iteratee.foreach((msg:JsObject)=>{ procede(msg)(chatroom)}  ).mapDone(_=>{
 		        disconnect(chatroom)
 		    })
 		    val res = (in,out)
