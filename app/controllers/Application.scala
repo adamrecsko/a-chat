@@ -15,10 +15,7 @@ import play.api.libs.json.DefaultFormat
 import play.api.libs.json.JsValue
 
 object Application extends Controller {
-  
   val (out, chatChannel) = Concurrent.broadcast[String]
-
-  
   def index = Action {
       Ok(views.html.index()  )
   }

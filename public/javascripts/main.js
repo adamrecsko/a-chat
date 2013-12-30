@@ -82,6 +82,21 @@ function ChannelManager(websocketService){
        return promise;
     }
 
+    this.resend= function(msg,timeout){
+       var promise = new Promise(); 
+       data = JSON.stringify(msg);
+       this.confirmations[msg._transferid]=promise;
+       if (timeout>0){
+             setTimeout(function(){
+              var error = Error("Timeout Error");
+              error.data = msg;
+              promise.failed(error);
+             },timeout);
+       }
+       this.websocketService.send(data);
+       return promise;
+    }
+
      this.push= function(channel,msg){
        msg._channel=channel;
        data = JSON.stringify(msg);
@@ -93,6 +108,7 @@ function ChannelManager(websocketService){
          var transferid = msg._transferid;
          if (_self.confirmations[transferid]!=undefined){
             _self.confirmations[transferid].success(msg);
+            delete _self.confirmations[transferid];
          }
     }
     //init
@@ -153,6 +169,10 @@ function  ComService (options)  {
      
      this.send = function(msg){
         this.ws.send(msg);
+     }
+
+     this.resend = function(msg,timeout){
+        return this.channelManager.resend(msg,timeout);
      }
      
      
@@ -217,14 +237,30 @@ function send(){
           msg.time=(new Date());
           msg.from="Én";
           $msg = appendMsg(msg,'info');
-          service.sure("message",msg,5000)
-           .onFailed(function(err){ 
-              $($msg).removeClass('panel-info').addClass('panel-danger');
 
-            })
-           .onSuccess(function(data){
-                $($msg).removeClass('panel-info').addClass('panel-success');
-           });
+          var failed = function(err){ 
+              var msg = err.data;
+              
+              this.mymsg = $($msg);
+              console.log(this.mymsg);
+
+              
+              $(this.mymsg).removeClass('panel-info').addClass('panel-warning');
+              service.resend(msg,5000)
+               .onFailed(failed)
+               .onSuccess(success);
+          }
+          
+          var success = function(data){
+                var $mymsg = $($msg);
+                $($mymsg).removeClass('panel-info')
+                .removeClass('panel-warning')
+                .addClass('panel-success');
+          }
+
+          service.sure("message",msg,5000)
+           .onFailed(failed)
+           .onSuccess(success);
 
         //  console.log(promise);     
        }

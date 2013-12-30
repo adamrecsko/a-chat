@@ -129,7 +129,9 @@ class ChatRoom[T] extends Actor {
 	        ) {chatter ! msg}
 	   } 
 	   
-	   case Disconnect =>
+	   case Disconnect => 
+	      chatters = for (chatter <- chatters if (chatter!=context.sender))yield chatter
+	      
 	      
 	 }
 	 
