@@ -1,5 +1,75 @@
 
 
+function AsyncStream(){
+    this.onFeeds = new Array(); 
+    this.pipes = new Array();
+    this._parent = false;
+    this._foreach = function(data){};
+    this._filter  = function(data){return true};
+    this._map  = function(data){return data};
+    this.pipe = function(stream){
+        stream._parent = this;
+        this.pipes.push(stream);
+    }
+    this.map = function(func){
+         var result = this.clone();
+         result._map = func;
+         return result;
+    }
+    this.filter = function(func){
+         var result = this.clone();
+         result._filter = func;
+         return result;
+    }
+
+    this.foreach = function(func){
+       var result = this.clone();
+       result._foreach = func;
+       return result;
+    }
+
+    this.feed = function(data){
+         for (var i = 0; i < this.onFeeds.length; i++) {
+             var onfeed = this.onFeeds[i];
+             onfeed(data);
+         }
+         var _data = this._map(data);
+         if (this._filter(_data)){
+            this.broadcast(_data);
+            this._foreach(_data);
+         }
+         
+    }
+    this.broadcast=function(data){
+        for (var i = 0; i < this.pipes.length; i++) {
+             var stream = this.pipes[i];
+             stream.feed(data);
+         }
+    }
+
+    this.onFeed = function(func){
+        this.onFeeds.push(func);
+    }
+
+    this.clone = function(){
+        var result = new AsyncStream();
+        this.pipe(result);
+        return result;
+    }
+    
+    this.closePipe =function(stream){
+         /**/
+    }
+    this.close = function(){
+        if (this._parent){
+            this._parent.closePipe(this);
+            this._parent.close();
+        }
+    }
+
+
+}
+
 function Promise(){
      this._empty = function(data){};
      this._data;
@@ -40,22 +110,19 @@ function UUID(){
 }
 
 function ChannelManager(websocketService){
+    this.messageStream =  new AsyncStream();
     this.websocketService = websocketService;
-    this.channels = new Array();
     this.confirmations = new Array();
     this.onMessage = function(data){
         var message = JSON.parse(data);
-        var channel = message._channel;
-        if (this.channels[channel] != undefined){
-            fnc = this.channels[channel];
-            fnc(message);
-        }
+        this.messageStream.feed(message);
     }
-    this.bind=function(channel,func){
-        this.channels[channel]=func;
+    this.bind=function(channel,func){  // to channel
+       return this.getStream()
+          .filter(function(msg){
+            return msg._channel==channel;
+        }).foreach(func);
     }
-    
-    
     this.newMsg = function(channel){
        var msg = {};
        msg._messageid = UUID();
@@ -97,7 +164,7 @@ function ChannelManager(websocketService){
        return promise;
     }
 
-     this.push= function(channel,msg){
+    this.push= function(channel,msg){
        msg._channel=channel;
        data = JSON.stringify(msg);
        this.websocketService.send(data);
@@ -111,6 +178,11 @@ function ChannelManager(websocketService){
             delete _self.confirmations[transferid];
          }
     }
+
+    this.getStream = function(){
+        return this.messageStream.clone()
+    }
+
     //init
     this.bind("_confirmation",this.confirmationAction);
 }
@@ -122,11 +194,11 @@ function  ComService (options)  {
      this.channelManager = new ChannelManager(this);
      
      this.defaults = {
-        onConnect: function(event){console.log(event);},
-        onOpen: function(event){console.log(event);},
-        onClose: function(event){console.log(event);},
+        onConnect: function(event){},
+        onOpen: function(event){},
+        onClose: function(event){},
         onMessage: function(event){},
-        onError: function(event){console.log(event);},
+        onError: function(event){},
         url : "ws://localhost",
         reconnect:true,
      };
@@ -180,7 +252,7 @@ function  ComService (options)  {
      this.bindEvents = function(websocket){
          websocket.onopen = function(evt) { self.onOpen(evt) };
          websocket.onclose = function(evt) { self.onClose(evt) };
-         websocket.onmessage = function(evt) { console.log(evt); self.onMessage(evt) };
+         websocket.onmessage = function(evt) {self.onMessage(evt) };
          websocket.onerror = function(evt) { self.onError(evt) };
          return websocket;
      }
@@ -196,7 +268,14 @@ function  ComService (options)  {
          return this.bindEvents(this.ws);
      }  
 
-     this.reconnect()
+     this.getMessageStream=function(){
+         return this.channelManager.getStream();
+     }
+     this.getChannel = function(channel){
+        return  this.getMessageStream().filter(function(msg){return msg._channel==channel});
+     }
+
+     this.reconnect();
 }
 
 var service = new ComService({
@@ -220,12 +299,48 @@ function appendMsg(msg,msgtype){
                return $msg;
 
 }
-service.on("message",function(msg){
+
+
+
+var messages = service.getChannel("message").foreach(function(msg){
      appendMsg(msg,'success'); 
      msg.msg = "OK";
      service.push("_confirmation",msg);
 });
 
+
+var statuses = service.getChannel("users")
+   .filter(function(msg){return msg._type=="status"});
+
+
+var connecteds    =   statuses.filter(function(msg){return msg.msg=="connected"})
+       .foreach(function(msg){
+        var from = msg.from;
+        $(".users").append('<li class="'+from+'">'+from+'</li>');
+   });
+
+var disconnecteds =    statuses.filter(function(msg){return msg.msg=="disconnected"})
+       .foreach(function(msg){
+        var from = msg.from;
+        $("."+from).remove();
+   });
+       
+//service.on("message",);
+
+/*
+service.on("users",function(msg){
+     var from = msg.from;
+     var _type = msg._type;
+
+     if (_type=="status"){
+
+        if (msg.content=="connected"){
+             $(".users").append('<li class="'+from+'">'+from+'</li>');
+        }
+     }
+    
+});
+*/
 
 
 function send(){

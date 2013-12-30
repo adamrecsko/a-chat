@@ -116,6 +116,10 @@ class ChatRooms[T] extends Actor{
 
 class ChatRoom[T] extends Actor {
      var chatters = List[ActorRef]()
+     
+     
+     
+     
 	 def receive = {
 	   case BindRoom(promise) => {
 	     val chatter =  Akka.system.actorOf(Props[Chatter])
@@ -149,14 +153,14 @@ class Chatter extends Actor{
        println(msg)
      }
      def disconnect(chatroom:ActorRef) ={
-        chatroom ! Msg(from=Some(uuid),content=Some("User disconnected"),_channel=Some("users"))
+        chatroom ! Msg(from=Some(uuid),content=Some("disconnected"),_channel=Some("users"),_type=Some("status"))
         chatroom ! Disconnect
 	    context.stop(self)
      }
      def receive = {
        case NewChatter(promise)=>{
              val chatroom = context.sender
-             chatroom ! Msg(from=Some(uuid),content=Some("Connected"),_channel=Some("users"))
+             chatroom ! Msg(from=Some(uuid),content=Some("connected"),_channel=Some("users"),_type=Some("status"))
 	          val in = Iteratee.foreach((msg:JsObject)=>{procede(msg)(chatroom)}  ).mapDone(_=>{
 		        disconnect(chatroom)
 		    })
