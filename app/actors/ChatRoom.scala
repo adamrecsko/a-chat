@@ -149,7 +149,8 @@ class Chatter extends Actor{
        chatroom ! Msg(from=Some(uuid),
            content=msg.content,
            _channel=msg._channel,
-           _transferid=msg._transferid)
+           _transferid=msg._transferid,
+           _type = msg._type)
        println(msg)
      }
      def disconnect(chatroom:ActorRef) ={

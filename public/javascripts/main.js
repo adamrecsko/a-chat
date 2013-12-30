@@ -276,6 +276,15 @@ function  ComService (options)  {
      }
 
      this.reconnect();
+
+
+     setInterval(function(){
+        var msg = {};
+        msg._channel = "users";
+        msg._type="status";
+        msg.msg = "alive";
+        self.push('users',msg);
+     },5000);
 }
 
 var service = new ComService({
@@ -300,7 +309,7 @@ function appendMsg(msg,msgtype){
 
 }
 
-
+//service.getMessageStream().foreach(function(msg){console.log(msg)});
 
 var messages = service.getChannel("message").foreach(function(msg){
      appendMsg(msg,'success'); 
@@ -313,18 +322,31 @@ var statuses = service.getChannel("users")
    .filter(function(msg){return msg._type=="status"});
 
 
-var connecteds    =   statuses.filter(function(msg){return msg.msg=="connected"})
+var connecteds    = statuses
+       .filter(function(msg){return msg.msg=="connected"})
        .foreach(function(msg){
         var from = msg.from;
         $(".users").append('<li class="'+from+'">'+from+'</li>');
    });
 
-var disconnecteds =    statuses.filter(function(msg){return msg.msg=="disconnected"})
+var disconnecteds = statuses
+       .filter(function(msg){return msg.msg=="disconnected"})
        .foreach(function(msg){
         var from = msg.from;
         $("."+from).remove();
    });
-       
+
+var alives = statuses
+  .filter(function(msg){
+      return msg.msg ==  "alive";
+  }).foreach(function(msg){
+      var from = msg.from;
+      var user  = $("."+from);
+      if (user.length == 0) {
+         $(".users").append('<li class="'+from+'">'+from+'</li>');
+      }
+  });
+
 //service.on("message",);
 
 /*
